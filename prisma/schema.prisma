@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id               String             @id @default(cuid())
+  points           Int                @default(0)
+  walletAddress    String             @unique
+  profilePicture   String?
+  telegramChatId   String?
+  telegramUsername String?
+  tgAuthToken      String?
+  followedVaults   Follow[]
+  firstName        String?
+  lastName         String?
+  fullName         String?
+  authMethod       String?
+  email            String?            @unique
+  phone            String?            @unique
+  username         String?            @unique
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  earlyAccess      Boolean            @default(false)
+  degenMode        Boolean            @default(false)
+  wallets          Wallet[]
+  notifications    Notification[]
+  transactions     Transaction[]
+  VaultInteraction VaultInteraction[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id                  String         @id @default(cuid())
+  ownerId             String
+  name                String?
+  publicKey           String
+  encryptedPrivateKey String?        @db.Text
+  walletSource        WalletSource   @default(CUSTOM)
+  chain               Chain          @default(CHILIZ)
+  delegated           Boolean        @default(false)
+  active              Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  owner               User           @relation(fields: [ownerId], references: [id])
+  transactions        Transaction[]
+  notifications       Notification[]
+
+  @@unique([ownerId, publicKey])
+  @@map("wallets")
+}
+
+model Follow {
+  id        String   @id @default(cuid())
+  userId    String
+  vaultId   String
+  user      User     @relation(fields: [userId], references: [id])
+  vault     Vault    @relation(fields: [vaultId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Strategy {
+  id          String   @id @default(cuid())
+  name        String
+  vaultId     String?
+  vaults      Vault[]
+  description String?
+  network     String?
+  type        String // "fixed", "yieldblox", etc.
+  apy         Float?
+  createdAt   DateTime @default(now())
+}
+
+model Vault {
+  id              String             @id @default(cuid())
+  name            String
+  contractAddress String             @unique
+  description     String?
+  tag             String? // eg low risk
+  apy             Float?
+  riskLevel       String
+  tvl             Float?
+  asset           String?
+  network         String // testnet, mainnet
+  logoUrl         String? // for display
+  createdAt       DateTime           @default(now())
+  strategies      Strategy[]
+  metrics         VaultMetric[]
+  followers       Follow[]
+  transactions    VaultInteraction[]
+}
+
+model VaultMetric {
+  id      String   @id @default(cuid())
+  vaultId String
+  vault   Vault    @relation(fields: [vaultId], references: [id])
+  apy     Float
+  date    DateTime @default(now())
+}
+
+model VaultInteraction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  vaultId   String
+  vault     Vault    @relation(fields: [vaultId], references: [id])
+  action    String // e.g. "deposit", "withdraw"
+  amount    Float
+  txHash    String?
+  timestamp DateTime @default(now())
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  title     String? // Short headline
+  body      String? // Detailed message
+  type      NotificationType
+  link      String? // Optional link to view more (market, player, etc.)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  Wallet    Wallet?          @relation(fields: [walletId], references: [id])
+  walletId  String?
+}
+
+model Transaction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type          TransactionType
+  amount        Float
+  token         String? // e.g., "ETH", "POINT"
+  description   String?
+  transactionId String? // ID from the external transaction (if applicable)
+
+  createdAt DateTime @default(now())
+  Wallet    Wallet?  @relation(fields: [walletId], references: [id])
+  walletId  String?
+}
+
+model EarlyAccessCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  used      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+  usedBy    String? // You can store privyId or userId here
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAW
+}
+
+enum WalletSource {
+  FREIGHTER
+  WALLET_CONNECT
+  METAMASK
+  CUSTOM
+}
+
+enum Chain {
+  STELLAR
+  POLYGON
+  ETHEREUM
+  CHILIZ
+}
+
+enum NotificationType {
+  VAULT_UPDATED // APY, risk, or description change
+  DEPOSIT_SUCCESS //'DEPOSIT_SUCCESS',
+  WITHDRAW_SUCCESS //'WITHDRAW_SUCCESS',
+  DEPOSIT_FAILED //'DEPOSIT_FAILED',
+  WITHDRAW_FAILED // 'WITHDRAW_FAILED',
+
+  EARNINGS_REMINDER // 'EARNINGS_REMINDER',     // Reminder to claim earnings
+  REWARD_EARNED // 'REWARD_EARNED',             // Points or bonuses
+  FOLLOW_UPDATES // 'FOLLOW_UPDATES',           // Updates to followed vaults
+  NEW_VAULT_LAUNCHED // 'NEW_VAULT_LAUNCHED',
+
+  TELEGRAM_LINKED // 'TELEGRAM_LINKED',         // Telegram successfully connected
+  TELEGRAM_REMINDER // 'TELEGRAM_REMINDER',     // Prompt to enable Telegram
+  SYSTEM_ANNOUNCEMENT // 'SYSTEM_ANNOUNCEMENT', // Admin messages or alerts
+  SECURITY_ALERT // 'SECURITY_ALERT',           // Suspicious activity
+}
