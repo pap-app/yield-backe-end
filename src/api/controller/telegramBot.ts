@@ -53,7 +53,7 @@ To link your account, just tap the button in the app or send me your connection 
   if (token) {
     try {
       await axios.post(
-        'https://99d5b3a74479.ngrok-free.app/api/v1/telegram/verify',
+        'https://steller-yield-backe-end.onrender.com/api/v1/telegram/verify',
         {
           token,
           telegramChatId: chatId,
